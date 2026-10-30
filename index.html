@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Denomination Dashboard</title>
+<style>
+  :root{--navy:#203864;--blue:#d9e2f3;--line:#c8ced8;--green:#92d050;--red:#c00000;--bg:#f4f6fa;--text:#1f2937}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:var(--navy);color:#fff;padding:18px 24px}
+  header h1{font-size:22px;margin:0 0 5px}
+  header p{margin:0;font-size:13px;opacity:.9}
+  .wrap{max-width:1250px;margin:22px auto;padding:0 16px}
+  .tabs{display:flex;gap:8px;margin-bottom:18px}
+  .tab{border:1px solid var(--navy);background:#fff;color:var(--navy);padding:11px 18px;font-weight:700;border-radius:7px;cursor:pointer}
+  .tab.active{background:var(--navy);color:#fff}
+  .page{display:none}.page.active{display:block}
+  .panel{background:#fff;border:1px solid #e0e5ed;border-radius:10px;padding:18px;margin-bottom:18px;box-shadow:0 2px 8px #15294b0b}
+  h2{font-size:18px;margin:0 0 14px;color:var(--navy)}
+  .table-wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:570px}
+  th,td{border:1px solid var(--line);padding:9px 10px;text-align:right}
+  th{background:var(--blue);color:#111;font-weight:700}
+  th:first-child,td:first-child{text-align:center}
+  td.label,th.label{text-align:left}
+  input{font:inherit;border:1px solid #cbd2dc;border-radius:4px;padding:8px;width:100%;min-width:70px;background:#fff}
+  input[type=number]{text-align:right}
+  input:focus{outline:2px solid #9bb7ee;border-color:#668bd5}
+  .money{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .total-row td{font-weight:700;background:#eef2f8}
+  .remaining{font-weight:700;background:#c00000;color:#fff}
+  .cashout{font-weight:700;background:var(--green);color:#14220a}
+  .summary-table{max-width:650px}
+  .summary-table th,.summary-table td{padding:11px 12px}
+  .actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+  button.action{border:0;border-radius:6px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--navy);color:white}
+  button.secondary{background:#e7edf7;color:var(--navy);border:1px solid #bdcbe2}
+  button.danger{background:#b42318}
+  button.edit{background:#e0a800;color:#fff}
+  .hint{font-size:13px;color:#596579;line-height:1.5;margin:10px 0 0}
+  .status{font-size:13px;color:#267343;margin-left:auto;align-self:center}
+
+  /* Modal Floating Styles */
+  .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;padding:15px}
+  .modal-overlay.active{display:flex}
+  .modal-card{background:#fff;border-radius:12px;width:100%;max-width:450px;box-shadow:0 10px 25px rgba(0,0,0,0.2);overflow:hidden;animation:fadeIn 0.2s ease-out}
+  @keyframes fadeIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+  .modal-header{background:var(--navy);color:#fff;padding:16px;font-size:18px;font-weight:700}
+  .modal-body{padding:16px;display:flex;flex-direction:column;gap:12px;max-height:80vh;overflow-y:auto}
+  .form-group{display:flex;flex-direction:column;gap:5px;text-align:left}
+  .form-group label{font-size:13px;font-weight:700;color:var(--navy)}
+  .modal-footer{padding:14px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px}
+  .modal-total{background:#eef2f8;padding:10px;border-radius:6px;text-align:right;font-weight:700;font-size:16px;color:var(--navy)}
+
+  @media(max-width:650px){
+    header{padding:14px 15px}
+    header h1{font-size:19px}
+    .wrap{margin:12px auto;padding:0 10px}
+    .panel{padding:11px;border-radius:8px;margin-bottom:12px}
+    h2{font-size:16px}
+    .tabs{position:sticky;top:0;z-index:5;background:var(--bg);padding:5px 0;gap:6px}
+    .tab{flex:1;padding:10px 5px;font-size:12px}
+    .table-wrap{overflow-x:visible}
+    table{min-width:0}
+    th,td{padding:7px 6px;font-size:13px}
+    .summary-table{width:100%;max-width:none}
+    .summary-table th,.summary-table td{padding:9px 7px;font-size:13px}
+    #entriesTable{display:block;width:100%}
+    #entriesTable thead{display:none}
+    #entriesTable tbody{display:block;width:100%}
+    #entriesTable tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:8px;margin:0 0 12px;overflow:hidden;background:#fff}
+    #entriesTable tbody td{display:flex;flex-direction:column;justify-content:center;gap:5px;text-align:left;border:0;border-bottom:1px solid #e6eaf0;padding:9px;min-width:0}
+    #entriesTable tbody td::before{content:attr(data-label);font-size:11px;font-weight:700;color:#596579;text-transform:uppercase}
+    #entriesTable tbody td:first-child{display:none}
+    #entriesTable tbody td:nth-child(2),#entriesTable tbody td:nth-child(3),#entriesTable tbody td:nth-child(7){grid-column:1 / -1}
+    #entriesTable tbody td:nth-child(7){font-weight:700;background:#eef2f8}
+    #entriesTable tbody td:last-child{grid-column:1 / -1;display:flex;flex-direction:row;gap:8px}
+    #entriesTable tbody td:last-child::before{content:""}
+    #entriesTable tbody td[data-label="Total Amt"]{text-align:right;align-items:flex-end}
+    #entriesTable tfoot{display:block;margin-top:8px}
+    #entriesTable tfoot tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line)}
+    #entriesTable tfoot td{padding:8px;font-size:12px}
+    #entriesTable tfoot td:first-child{grid-column:1 / -1}
+    .actions{gap:7px}
+    button.action{padding:10px 11px;font-size:13px}
+    .status{width:100%;margin-left:0}
+  }
+  @media print{body{background:#fff}.tabs,.actions,.no-print,header p{display:none!important}.page{display:block!important}.panel{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Cash Denomination Dashboard</h1>
+  <p>Manage cash received by denomination and see the dashboard update automatically.</p>
+</header>
+<div class="wrap">
+  <nav class="tabs no-print" aria-label="Pages">
+    <button class="tab active" data-page="dashboard">Page 1 — Dashboard</button>
+    <button class="tab" data-page="denomination">Page 2 — Denomination</button>
+  </nav>
+
+  <section id="dashboard" class="page active">
+    <div class="panel">
+      <h2>Opening Cash Balance</h2>
+      <p class="hint"></p>
+      <div class="table-wrap">
+        <table class="summary-table">
+          <thead><tr><th>Deno</th><th>Note</th><th>Amt</th></tr></thead>
+          <tbody id="openingRows"></tbody>
+          <tfoot><tr class="total-row"><td colspan="2" style="text-align:center">Total</td><td class="money" id="openingTotal">0</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Denomination Entry Count</h2>
+      <div style="display:flex;align-items:center;gap:14px;background:#eef2f8;border:1px solid #c8ced8;border-radius:8px;padding:14px 16px">
+        <div style="background:#203864;color:#fff;border-radius:10px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="font-size:23px;font-weight:700" id="peopleCountIcon">0</span>
+        </div>
+        <div>
+          <div style="font-size:13px;color:#596579">Number of people added</div>
+          <div style="font-size:23px;font-weight:700;color:#203864"><span id="peopleCount">0</span> people</div>
+        </div>
+      </div>
+      <p class="hint"></p>
+    </div>
+    <div class="panel">
+      <h2>Denomination Summary</h2>
+      <div class="table-wrap">
+        <table class="summary-table">
+          <thead><tr><th>Deno</th><th>Note</th><th>Amt</th></tr></thead>
+          <tbody id="summaryRows"></tbody>
+          <tfoot>
+            <tr><td colspan="2" style="text-align:center;font-weight:700">Remaining Amt</td><td class="remaining money" id="remainingAmt">0</td></tr>
+            <tr><td colspan="2" style="text-align:center;font-weight:700">Cash Out Amt</td><td class="cashout money" id="cashOutAmt">0</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="hint"></p>
+    </div>
+    <div class="actions no-print">
+      <button class="action" onclick="window.print()">Print / Save PDF</button>
+      <button class="action secondary" id="exportBtn">Export Denomination CSV</button>
+      <button class="action danger" id="resetBtn">Reset All Data</button>
+      <span class="status" id="saveStatus">Auto-save enabled in this browser</span>
+    </div>
+  </section>
+
+  <section id="denomination" class="page">
+    <div class="panel">
+      <h2>Denomination Entry</h2>
+      <p class="hint"></p>
+      <div class="table-wrap">
+        <table id="entriesTable">
+          <thead><tr><th>No</th><th class="label">Name</th><th class="label">Phone</th><th>10,000</th><th>5,000</th><th>1,000</th><th>Total Amt</th><th class="no-print">Action</th></tr></thead>
+          <tbody id="entriesBody"></tbody>
+          <tfoot><tr class="total-row"><td colspan="3" style="text-align:center">Grand Total</td><td id="sum10000">0</td><td id="sum5000">0</td><td id="sum1000">0</td><td class="money" id="grandTotal">0</td><td class="no-print"></td></tr></tfoot>
+        </table>
+      </div>
+      <div class="actions no-print">
+        <button class="action" id="openAddModalBtn">+ Add Person</button>
+        <button class="action secondary" id="sampleBtn">Load Sample Data</button>
+        <button class="action secondary" id="clearEntriesBtn">Clear Entries</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Floating Modal for Add/Edit Person -->
+<div class="modal-overlay" id="personModal">
+  <div class="modal-card">
+    <div class="modal-header" id="modalTitle">Add Person</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="modalName">Name</label>
+        <input type="text" id="modalName" placeholder="Enter Name">
+      </div>
+      <div class="form-group">
+        <label for="modalPhone">Phone Number</label>
+        <input type="tel" id="modalPhone" placeholder="Enter Phone Number">
+      </div>
+      <div class="form-group">
+        <label for="modal10000">10,000 Notes</label>
+        <input type="number" id="modal10000" min="0" step="1" placeholder="Enter notes">
+      </div>
+      <div class="form-group">
+        <label for="modal5000">5,000 Notes</label>
+        <input type="number" id="modal5000" min="0" step="1" placeholder="Enter notes">
+      </div>
+      <div class="form-group">
+        <label for="modal1000">1,000 Notes</label>
+        <input type="number" id="modal1000" min="0" step="1" placeholder="Enter notes">
+      </div>
+      <div class="modal-total">
+        Total Amount: <span id="modalTotalAmt">0</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="action secondary" id="modalCancelBtn">Cancel</button>
+      <button class="action" id="modalConfirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const denominations = [10000, 5000, 1000];
+  const STORAGE_KEY = 'cashDenominationDashboard_v2';
+  let entries = [];
+  let openingNotes = {10000: 2000, 5000: 2000, 1000: 0};
+  let currentEditIndex = -1;
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n || 0).toLocaleString('en-US');
+  const safe = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({entries, openingNotes}));
+      $('saveStatus').textContent = 'Saved automatically';
+    } catch (e) {
+      $('saveStatus').textContent = 'Auto-save unavailable in this browser';
+    }
+  }
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (data && Array.isArray(data.entries)) entries = data.entries;
+      if (data && data.openingNotes) denominations.forEach(d => openingNotes[d] = Math.max(0, Number(data.openingNotes[d]) || 0));
+    } catch (e) {}
+  }
+
+  function makeOpeningRows() {
+    $('openingRows').innerHTML = denominations.map(d => `<tr>
+      <td data-label="Deno">${fmt(d)}</td>
+      <td data-label="Note"><input type="number" min="0" step="1" aria-label="${d} opening note count" data-opening="${d}" value="${openingNotes[d] || ''}" placeholder="0"></td>
+      <td class="money" data-label="Amt" id="openingAmt${d}">${fmt(openingNotes[d] * d)}</td>
+    </tr>`).join('');
+    $('openingRows').querySelectorAll('[data-opening]').forEach(inp => inp.addEventListener('input', () => {
+      openingNotes[inp.dataset.opening] = Math.max(0, Math.floor(Number(inp.value) || 0));
+      updateAll(); save();
+    }));
+  }
+
+  function renderEntries() {
+    const body = $('entriesBody');
+    body.innerHTML = entries.map((e, i) => `<tr>
+      <td>${i + 1}</td>
+      <td class="label" data-label="Name">${safe(e.name) || '-'}</td>
+      <td class="label" data-label="Phone">${safe(e.phone) || '-'}</td>
+      ${denominations.map(d => `<td data-label="${fmt(d)} notes">${fmt(e[d] || 0)}</td>`).join('')}
+      <td class="money" data-label="Total Amt">${fmt(denominations.reduce((s,d)=>s+d*(Number(e[d])||0),0))}</td>
+      <td class="no-print" data-label="Action">
+        <button class="action edit" style="padding:7px 9px" data-edit="${i}">Edit</button>
+        <button class="action danger" style="padding:7px 9px" data-delete="${i}">Delete</button>
+      </td>
+    </tr>`).join('');
+
+    body.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
+      openModal(Number(btn.dataset.edit));
+    }));
+    body.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => {
+      entries.splice(Number(btn.dataset.delete), 1); renderEntries(); updateAll(); save();
+    }));
+  }
+
+  function updateAll() {
+    $('peopleCount').textContent = fmt(entries.length);
+    $('peopleCountIcon').textContent = fmt(entries.length);
+    const openingTotal = denominations.reduce((s,d)=>s+d*openingNotes[d],0);
+    $('openingTotal').textContent = fmt(openingTotal);
+    denominations.forEach(d => { const el = $('openingAmt'+d); if(el) el.textContent = fmt(d*openingNotes[d]); });
+
+    const counts = Object.fromEntries(denominations.map(d => [d, entries.reduce((s,e)=>s+(Number(e[d])||0),0)]));
+    const enteredTotal = denominations.reduce((s,d)=>s+d*counts[d],0);
+    const cashOut = openingTotal - enteredTotal;
+    $('summaryRows').innerHTML = denominations.map(d => `<tr><td data-label="Deno">${fmt(d)}</td><td data-label="Note">${fmt(counts[d])}</td><td class="money" data-label="Amt">${counts[d] ? fmt(counts[d]*d) : '-'}</td></tr>`).join('');
+    $('remainingAmt').textContent = fmt(enteredTotal);
+    $('cashOutAmt').textContent = fmt(cashOut);
+    $('sum10000').textContent = fmt(counts[10000]);
+    $('sum5000').textContent = fmt(counts[5000]);
+    $('sum1000').textContent = fmt(counts[1000]);
+    $('grandTotal').textContent = fmt(enteredTotal);
+    $('cashOutAmt').style.background = cashOut < 0 ? '#c00000' : '';
+    $('cashOutAmt').style.color = cashOut < 0 ? '#fff' : '';
+  }
+
+  /* Modal Logic */
+  function calculateModalTotal() {
+    const n10000 = Math.max(0, Math.floor(Number($('modal10000').value) || 0));
+    const n5000 = Math.max(0, Math.floor(Number($('modal5000').value) || 0));
+    const n1000 = Math.max(0, Math.floor(Number($('modal1000').value) || 0));
+    const total = (n10000 * 10000) + (n5000 * 5000) + (n1000 * 1000);
+    $('modalTotalAmt').textContent = fmt(total);
+  }
+
+  ['modal10000', 'modal5000', 'modal1000'].forEach(id => {
+    $(id).addEventListener('input', calculateModalTotal);
+  });
+
+  function openModal(index = -1) {
+    currentEditIndex = index;
+    if (index >= 0) {
+      const item = entries[index];
+      $('modalTitle').textContent = 'Edit Person';
+      $('modalName').value = item.name || '';
+      $('modalPhone').value = item.phone || '';
+      $('modal10000').value = item[10000] || '';
+      $('modal5000').value = item[5000] || '';
+      $('modal1000').value = item[1000] || '';
+    } else {
+      $('modalTitle').textContent = 'Add Person';
+      $('modalName').value = '';
+      $('modalPhone').value = '';
+      $('modal10000').value = '';
+      $('modal5000').value = '';
+      $('modal1000').value = '';
+    }
+    calculateModalTotal();
+    $('personModal').classList.add('active');
+  }
+
+  function closeModal() {
+    $('personModal').classList.remove('active');
+  }
+
+  $('openAddModalBtn').addEventListener('click', () => openModal(-1));
+  $('modalCancelBtn').addEventListener('click', closeModal);
+
+  $('modalConfirmBtn').addEventListener('click', () => {
+    const data = {
+      name: $('modalName').value.trim(),
+      phone: $('modalPhone').value.trim(),
+      10000: Math.max(0, Math.floor(Number($('modal10000').value) || 0)),
+      5000: Math.max(0, Math.floor(Number($('modal5000').value) || 0)),
+      1000: Math.max(0, Math.floor(Number($('modal1000').value) || 0))
+    };
+
+    if (currentEditIndex >= 0) {
+      entries[currentEditIndex] = data;
+    } else {
+      entries.push(data);
+    }
+
+    closeModal();
+    renderEntries();
+    updateAll();
+    save();
+  });
+
+  $('clearEntriesBtn').addEventListener('click', () => {
+    if(confirm('Clear all denomination entries?')) { entries = []; renderEntries(); updateAll(); save(); }
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    if(confirm('Reset all data to 0?')) {
+      entries = [];
+      openingNotes = {10000: 0, 5000: 0, 1000: 0};
+      makeOpeningRows();
+      renderEntries();
+      updateAll();
+      save();
+    }
+  });
+
+  $('sampleBtn').addEventListener('click', () => {
+    entries = [
+      {name:'Ye Lin Htun',phone:'09759745054',10000:46,5000:0,1000:0},
+      {name:'Si Thu Htun',phone:'09451091098',10000:3,5000:100,1000:0},
+      {name:'Thin Yadanar Aung',phone:'09758068909',10000:92,5000:0,1000:0},
+      {name:'Zin Lay Nwee',phone:'09755425905',10000:50,5000:0,1000:0}
+    ];
+    renderEntries(); updateAll(); save();
+  });
+
+  $('exportBtn').addEventListener('click', () => {
+    const rows = [['No','Name','Phone','10000','5000','1000','Total Amt']];
+    entries.forEach((e,i)=>rows.push([i+1,e.name,e.phone,...denominations.map(d=>Number(e[d])||0),denominations.reduce((s,d)=>s+d*(Number(e[d])||0),0)]));
+    const csv = rows.map(row => row.map(v => '"' + String(v ?? '').replace(/"/g,'""') + '"').join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'denomination_entries.csv'; a.click(); URL.revokeObjectURL(url);
+  });
+
+  document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===btn.dataset.page));
+  }));
+
+  load(); makeOpeningRows(); renderEntries(); updateAll();
+})();
+</script>
+</body>
+</html>
