@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cash Denomination Dashboard</title>
+<title>Cash Denomination Reconciliation</title>
 <style>
   :root{--navy:#203864;--blue:#d9e2f3;--line:#c8ced8;--green:#92d050;--red:#c00000;--bg:#f4f6fa;--text:#1f2937}
   *{box-sizing:border-box}
@@ -29,10 +29,14 @@
   input:focus{outline:2px solid #9bb7ee;border-color:#668bd5}
   .money{font-variant-numeric:tabular-nums;white-space:nowrap}
   .total-row td{font-weight:700;background:#eef2f8}
-  .remaining{font-weight:700;background:#c00000;color:#fff}
   .cashout{font-weight:700;background:var(--green);color:#14220a}
-  .summary-table{max-width:650px}
+  .summary-table{width:100%}
   .summary-table th,.summary-table td{padding:11px 12px}
+  
+  /* Grid layout for Dashboard side-by-side tables */
+  .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:900px){.dashboard-grid{grid-template-columns:1fr}}
+
   .actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
   button.action{border:0;border-radius:6px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--navy);color:white}
   button.secondary{background:#e7edf7;color:var(--navy);border:1px solid #bdcbe2}
@@ -64,7 +68,6 @@
     .table-wrap{overflow-x:visible}
     table{min-width:0}
     th,td{padding:7px 6px;font-size:13px}
-    .summary-table{width:100%;max-width:none}
     .summary-table th,.summary-table td{padding:9px 7px;font-size:13px}
     #entriesTable{display:block;width:100%}
     #entriesTable thead{display:none}
@@ -91,7 +94,7 @@
 </head>
 <body>
 <header>
-  <h1>Cash Denomination Dashboard</h1>
+  <h1>Cash Denomination Reconciliation</h1>
   <p></p>
 </header>
 <div class="wrap">
@@ -112,6 +115,7 @@
         </table>
       </div>
     </div>
+
     <div class="panel">
       <h2>Denomination Entry Count</h2>
       <div style="display:flex;align-items:center;gap:14px;background:#eef2f8;border:1px solid #c8ced8;border-radius:8px;padding:14px 16px">
@@ -119,27 +123,45 @@
           <span style="font-size:23px;font-weight:700" id="peopleCountIcon">0</span>
         </div>
         <div>
-          <div style="font-size:13px;color:#596579"></div>
+          <div style="font-size:13px;color:#596579">Number of people added</div>
           <div style="font-size:23px;font-weight:700;color:#203864"><span id="peopleCount">0</span> people</div>
         </div>
       </div>
       <p class="hint"></p>
     </div>
-    <div class="panel">
-      <h2>Denomination Summary</h2>
-      <div class="table-wrap">
-        <table class="summary-table">
-          <thead><tr><th>Deno</th><th>Note</th><th>Amt</th></tr></thead>
-          <tbody id="summaryRows"></tbody>
-          <tfoot>
-            <tr><td colspan="2" style="text-align:center;font-weight:700">Remaining Amt</td><td class="remaining money" id="remainingAmt">0</td></tr>
-            <tr><td colspan="2" style="text-align:center;font-weight:700">Cash Out Amt</td><td class="cashout money" id="cashOutAmt">0</td></tr>
-          </tfoot>
-        </table>
+
+    <!-- Side by side grid for Deno Summary & Remaining Denomination Sheet -->
+    <div class="dashboard-grid">
+      <div class="panel" style="margin-bottom:0">
+        <h2>Denomination Summary (Used)</h2>
+        <div class="table-wrap">
+          <table class="summary-table">
+            <thead><tr><th>Deno</th><th>Note</th><th>Amt</th></tr></thead>
+            <tbody id="summaryRows"></tbody>
+            <tfoot>
+              <tr><td colspan="2" style="text-align:center;font-weight:700">Cash Out Amt</td><td class="cashout money" id="cashOutAmt">0</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <p class="hint"></p>
       </div>
-      <p class="hint"></p>
+
+      <div class="panel" style="margin-bottom:0">
+        <h2>Remaining Deno Sheet (Cash in Hand)</h2>
+        <div class="table-wrap">
+          <table class="summary-table">
+            <thead><tr><th>Deno</th><th>Note</th><th>Amt</th></tr></thead>
+            <tbody id="remainingDenoRows"></tbody>
+            <tfoot>
+              <tr class="total-row"><td colspan="2" style="text-align:center">Total Balance</td><td class="money" id="remainingDenoTotal">0</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <p class="hint"></p>
+      </div>
     </div>
-    <div class="actions no-print">
+
+    <div class="actions no-print" style="margin-top:18px">
       <button class="action" onclick="window.print()">Print / Save PDF</button>
       <button class="action secondary" id="exportBtn">Export Denomination CSV</button>
       <button class="action danger" id="resetBtn">Reset All Data</button>
@@ -206,9 +228,9 @@
 <script>
 (() => {
   const denominations = [10000, 5000, 1000];
-  const STORAGE_KEY = 'cashDenominationDashboard_v2';
+  const STORAGE_KEY = 'cashDenominationReconciliation_v4';
   let entries = [];
-  let openingNotes = {10000: 2000, 5000: 2000, 1000: 0};
+  let openingNotes = {10000: 10000, 5000: 10000, 1000: 1000};
   let currentEditIndex = -1;
 
   const $ = id => document.getElementById(id);
@@ -274,16 +296,29 @@
 
     const counts = Object.fromEntries(denominations.map(d => [d, entries.reduce((s,e)=>s+(Number(e[d])||0),0)]));
     const enteredTotal = denominations.reduce((s,d)=>s+d*counts[d],0);
-    const cashOut = openingTotal - enteredTotal;
+
+    // Denomination Summary (Used)
     $('summaryRows').innerHTML = denominations.map(d => `<tr><td data-label="Deno">${fmt(d)}</td><td data-label="Note">${fmt(counts[d])}</td><td class="money" data-label="Amt">${counts[d] ? fmt(counts[d]*d) : '-'}</td></tr>`).join('');
-    $('remainingAmt').textContent = fmt(enteredTotal);
-    $('cashOutAmt').textContent = fmt(cashOut);
+    $('cashOutAmt').textContent = fmt(enteredTotal);
+
+    // Remaining Denomination Sheet (Cash in Hand Breakdown)
+    let remainingDenoTotalAmt = 0;
+    $('remainingDenoRows').innerHTML = denominations.map(d => {
+      const remNote = Math.max(0, (openingNotes[d] || 0) - (counts[d] || 0));
+      const remAmt = remNote * d;
+      remainingDenoTotalAmt += remAmt;
+      return `<tr>
+        <td data-label="Deno">${fmt(d)}</td>
+        <td data-label="Note" style="${remNote < 0 ? 'color:red;font-weight:700' : ''}">${fmt(remNote)}</td>
+        <td class="money" data-label="Amt">${remAmt ? fmt(remAmt) : '-'}</td>
+      </tr>`;
+    }).join('');
+    $('remainingDenoTotal').textContent = fmt(remainingDenoTotalAmt);
+
     $('sum10000').textContent = fmt(counts[10000]);
     $('sum5000').textContent = fmt(counts[5000]);
     $('sum1000').textContent = fmt(counts[1000]);
     $('grandTotal').textContent = fmt(enteredTotal);
-    $('cashOutAmt').style.background = cashOut < 0 ? '#c00000' : '';
-    $('cashOutAmt').style.color = cashOut < 0 ? '#fff' : '';
   }
 
   /* Modal Logic */
@@ -380,7 +415,7 @@
     const csv = rows.map(row => row.map(v => '"' + String(v ?? '').replace(/"/g,'""') + '"').join(',')).join('\r\n');
     const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = 'denomination_entries.csv'; a.click(); URL.revokeObjectURL(url);
+    a.href = url; a.download = 'denomination_reconciliation.csv'; a.click(); URL.revokeObjectURL(url);
   });
 
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
